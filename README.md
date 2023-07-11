@@ -21,7 +21,7 @@ python3 example.py --address "C84441EE-5C57-2681-1BD5-82AF18C58F5D" --api-key "8
 One of
 
 ```
-bumpver update --major
-bumpver update --minor
-bumpver update --patch
+bumpver update --commit --tag-commit --push --major
+bumpver update --commit --tag-commit --push --minor
+bumpver update --commit --tag-commit --push --patch
 ```
