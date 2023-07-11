@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "decora_bleak"
+version = "0.0.0"
+authors = [
+  { name="Colin Campbell", email="colin.campbell@gmail.com" },
+]
+description = "A package for interacting with Decora switches and dimmers over BLE"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[tool.bumpver]
+current_version = "0.0.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
+"setup.py" = ['version="{version}"']
+"src/decora_bleak/__init__.py" = ['__version__ = "{version}"']
