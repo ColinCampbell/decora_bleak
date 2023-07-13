@@ -70,9 +70,10 @@ class DecoraBLEDevice():
     async def disconnect(self) -> None:
         await self._client.disconnect()
 
-    async def turn_on(self) -> None:
+    async def turn_on(self, brightness_level: Optional[int] = None) -> None:
         _LOGGER.debug("Turning on...")
-        await self._write_state(replace(self._state, is_on=True))
+        brightness_level = brightness_level if brightness_level is not None else self._state.brightness_level
+        await self._write_state(replace(self._state, is_on=True, brightness_level=brightness_level))
 
     async def turn_off(self) -> None:
         _LOGGER.debug("Turning off...")
