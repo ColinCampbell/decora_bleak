@@ -58,12 +58,20 @@ async def connect(address: str, api_key: Optional[str]) -> None:
         print(f"Fetched API key from device: {api_key}")
 
     if api_key is not None:
-        _LOGGER.info("Connecting to device at %s with key: %s",
-                     device.address, api_key)
+        print(f"Connecting to device at {device.address} with key: {api_key}")
 
         decora_device = DecoraBLEDevice()
         await decora_device.connect(device, api_key)
-        await decora_device.turn_on()
+
+        def state_callback(state):
+            if state.is_on:
+                print(
+                    f"Light is now turned on ({state.brightness_level}% brightness)")
+            else:
+                print("Light is now turned off")
+        unregister_callback = await decora_device.register_state_callback(state_callback)
+
+        await decora_device.turn_on(brightness_level=100)
         await asyncio.sleep(5)
         await decora_device.turn_off()
         await asyncio.sleep(5)
@@ -71,6 +79,7 @@ async def connect(address: str, api_key: Optional[str]) -> None:
         await asyncio.sleep(5)
         await decora_device.set_brightness_level(50)
 
+        unregister_callback()
         await decora_device.disconnect()
     else:
         _LOGGER.error(
