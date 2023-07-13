@@ -4,16 +4,18 @@ Python module for interacting with Leviton bluetooth switches and dimmers via BL
 
 ## Using
 
+Once the package is installed (and assuming the repo was cloned to make changes) using `python -m pip install -e .`:
+
 ```
-python3 example.py
+decora scan
 ```
 
 ```
-python3 example.py --address "C84441EE-5C57-2681-1BD5-82AF18C58F5D"
+decora connect -a "C84441EE-5C57-2681-1BD5-82AF18C58F5D"
 ```
 
 ```
-python3 example.py --address "C84441EE-5C57-2681-1BD5-82AF18C58F5D" --api-key "8c4c89fa00"
+decora connect -a "C84441EE-5C57-2681-1BD5-82AF18C58F5D" -k "8c4c89fa00"
 ```
 
 ## Releasing

@@ -17,6 +17,15 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+  "bleak >= 0.20.2"
+]
+
+[project.optional-dependencies]
+dev = ["bumpver", "isort", "pip-tools", "pytest"]
+
+[project.scripts]
+decora = "decora_bleak.cmd:main"
 
 [tool.bumpver]
 current_version = "0.0.1"
