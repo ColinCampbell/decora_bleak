@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import logging
+from collections.abc import Callable
 from typing import Optional
 
-from bleak import BleakClient
+from bleak import BleakClient, BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
 from .const import EVENT_CHARACTERISTIC_UUID, STATE_CHARACTERISTIC_UUID, UNPAIRED_API_KEY
@@ -18,6 +21,7 @@ class DecoraBLEDevice():
         self._device = None
         self._key = None
         self._state = DecoraBLEDeviceState(is_on=False, brightness_level=0)
+        self._state_callbacks: list[Callable[[DecoraBLEDeviceState], None]] = []
 
     async def get_api_key(device: BLEDevice) -> Optional[str]:
         async with BleakClient(device) as client:
@@ -30,7 +34,16 @@ class DecoraBLEDevice():
             else:
                 return None
 
-    async def connect(self, device: BLEDevice, key: str):
+    async def register_state_callback(
+        self, callback: Callable[[DecoraBLEDeviceState], None]
+    ) -> Callable[[], None]:
+        def unregister_callback() ->  None:
+            self._state_callbacks.remove(callback)
+
+        self._state_callbacks.append(callback)
+        return unregister_callback
+
+    async def connect(self, device: BLEDevice, key: str) -> None:
         _LOGGER.debug("attempting to connect to %s using %s key", device.address, key)
 
         if self._client is not None and self._client.is_connected:
@@ -49,6 +62,8 @@ class DecoraBLEDevice():
         await self._client.connect()
         await self._unlock()
 
+        await self._register_for_state_notifications()
+
         _LOGGER.debug("Finished connecting %s", self._client.is_connected)
 
     async def disconnect(self):
@@ -56,17 +71,14 @@ class DecoraBLEDevice():
 
     async def turn_on(self):
         _LOGGER.debug("Turning on...")
-        await self._refresh_state()
         await self._write_state(DecoraBLEDeviceState(is_on=True, brightness_level=self._state.brightness_level))
 
     async def turn_off(self):
         _LOGGER.debug("Turning off...")
-        await self._refresh_state()
         await self._write_state(DecoraBLEDeviceState(is_on=False, brightness_level=self._state.brightness_level))
 
-    async def set_brightness_level(self, brightness_level):
+    async def set_brightness_level(self, brightness_level: int):
         _LOGGER.debug("Setting brightness level to %d...", brightness_level)
-        await self._refresh_state()
         await self._write_state(DecoraBLEDeviceState(is_on=self._state.is_on, brightness_level=brightness_level))
 
     def _disconnect_cleanup(self):
@@ -79,13 +91,23 @@ class DecoraBLEDevice():
         packet = bytearray([0x11, 0x53, *self._key])
         await self._client.write_gatt_char(EVENT_CHARACTERISTIC_UUID, packet, response=True)
 
-    async def _refresh_state(self):
-        data = await self._client.read_gatt_char(STATE_CHARACTERISTIC_UUID)
+    def _apply_device_state_data(self, data: bytearray) -> None:
         self._state = DecoraBLEDeviceState(is_on=data[0] == 1, brightness_level=data[1])
         _LOGGER.debug("State updated: %s", self._state)
 
-    async def _write_state(self, state):
+    async def _write_state(self, state: DecoraBLEDeviceState) -> None:
         self._state = state
         packet = bytearray([1 if state.is_on else 0, state.brightness_level])
         _LOGGER.debug("Writing state: %s", state)
         await self._client.write_gatt_char(STATE_CHARACTERISTIC_UUID, packet, response=True)
+
+    async def _register_for_state_notifications(self):
+        def callback(sender: BleakGATTCharacteristic, data: bytearray) -> None:
+            self._apply_device_state_data(data)
+            self._fire_state_callbacks()
+
+        self._client.start_notify(STATE_CHARACTERISTIC_UUID, callback)
+
+    def _fire_state_callbacks(self) -> None:
+        for callback in self._state_callbacks:
+            callback(self._state)
