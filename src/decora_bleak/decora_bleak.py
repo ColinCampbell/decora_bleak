@@ -15,14 +15,14 @@ from .models import DecoraBLEDeviceState
 _LOGGER = logging.getLogger(__name__)
 
 
-
 class DecoraBLEDevice():
     def __init__(self):
         self._client = None
         self._device = None
         self._key = None
         self._state = DecoraBLEDeviceState()
-        self._state_callbacks: list[Callable[[DecoraBLEDeviceState], None]] = []
+        self._state_callbacks: list[Callable[[
+            DecoraBLEDeviceState], None]] = []
 
     async def get_api_key(device: BLEDevice) -> Optional[str]:
         async with BleakClient(device) as client:
@@ -38,17 +38,19 @@ class DecoraBLEDevice():
     async def register_state_callback(
         self, callback: Callable[[DecoraBLEDeviceState], None]
     ) -> Callable[[], None]:
-        def unregister_callback() ->  None:
+        def unregister_callback() -> None:
             self._state_callbacks.remove(callback)
 
         self._state_callbacks.append(callback)
         return unregister_callback
 
     async def connect(self, device: BLEDevice, key: str) -> None:
-        _LOGGER.debug("attempting to connect to %s using %s key", device.address, key)
+        _LOGGER.debug("attempting to connect to %s using %s key",
+                      device.address, key)
 
         if self._client is not None and self._client.is_connected:
-            _LOGGER.debug("there is already a client connected, disconnecting...")
+            _LOGGER.debug(
+                "there is already a client connected, disconnecting...")
             self._client.disconnect()
 
         self._device = device
@@ -94,7 +96,8 @@ class DecoraBLEDevice():
         await self._client.write_gatt_char(EVENT_CHARACTERISTIC_UUID, packet, response=True)
 
     def _apply_device_state_data(self, data: bytearray) -> None:
-        self._state = replace(self._state, is_on=data[0] == 1, brightness_level=data[1])
+        self._state = replace(
+            self._state, is_on=data[0] == 1, brightness_level=data[1])
         _LOGGER.debug("State updated: %s", self._state)
 
     async def _write_state(self, state: DecoraBLEDeviceState) -> None:
@@ -108,7 +111,7 @@ class DecoraBLEDevice():
             self._apply_device_state_data(data)
             self._fire_state_callbacks()
 
-        self._client.start_notify(STATE_CHARACTERISTIC_UUID, callback)
+        await self._client.start_notify(STATE_CHARACTERISTIC_UUID, callback)
 
     def _fire_state_callbacks(self) -> None:
         for callback in self._state_callbacks:
