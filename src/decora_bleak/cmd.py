@@ -36,22 +36,23 @@ async def scan() -> None:
         print("Did not discover any Decora devices, try moving closer to the switch or trying again")
 
 
+async def summarize(address: str, api_key: str) -> None:
+    device = await _find_device(address)
+    if device is None:
+        _LOGGER.error("Could not find device at %s, please try again", address)
+        return
+
+    decora_device = DecoraBLEDevice()
+    await decora_device.connect(device, api_key)
+
+    print(f"{decora_device.summarize()}")
+
+
 async def connect(address: str, api_key: Optional[str]) -> None:
-    future: asyncio.Future[BLEDevice] = asyncio.Future()
-
-    def on_detected(device: BLEDevice, adv: AdvertisementData) -> None:
-        if future.done():
-            return
-
-        if device.address.lower() == address.lower():
-            _LOGGER.info("Found device: %s", device.address)
-            future.set_result(device)
-
-    scanner = BleakScanner(detection_callback=on_detected)
-    await scanner.start()
-
-    device = await future
-    await scanner.stop()
+    device = await _find_device(address)
+    if device is None:
+        _LOGGER.error("Could not find device at %s, please try again", address)
+        return
 
     if api_key is None:
         api_key = await DecoraBLEDevice.get_api_key(device)
@@ -86,12 +87,37 @@ async def connect(address: str, api_key: Optional[str]) -> None:
             "Switch is not in pairing mode - hold down until green light flashes and execute this function again")
 
 
+async def _find_device(address: str) -> Optional[BLEDevice]:
+    future: asyncio.Future[BLEDevice] = asyncio.Future()
+
+    def on_detected(device: BLEDevice, adv: AdvertisementData) -> None:
+        if future.done():
+            return
+
+        if device.address.lower() == address.lower():
+            _LOGGER.info("Found device: %s", device.address)
+            future.set_result(device)
+
+    scanner = BleakScanner(detection_callback=on_detected)
+    await scanner.start()
+
+    device = await future
+    await scanner.stop()
+
+    return device
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Interact with Decora BLE devices")
     subparsers = parser.add_subparsers(dest="subparser")
 
     scan_subparser = subparsers.add_parser("scan")
+
+    summarize_subparser = subparsers.add_parser("summarize")
+    summarize_subparser.add_argument("-a", "--address", dest="address")
+    summarize_subparser.add_argument(
+        "-k", "--api-key", dest="api_key")
 
     connect_subparser = subparsers.add_parser("connect")
     connect_subparser.add_argument("-a", "--address", dest="address")

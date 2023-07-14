@@ -9,8 +9,8 @@ from dataclasses import replace
 from bleak import BleakClient, BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
-from .const import EVENT_CHARACTERISTIC_UUID, STATE_CHARACTERISTIC_UUID, UNPAIRED_API_KEY
-from .models import DecoraBLEDeviceState
+from .const import EVENT_CHARACTERISTIC_UUID, STATE_CHARACTERISTIC_UUID, UNPAIRED_API_KEY, SYSTEM_ID_DESCRIPTOR_UUID, MODEL_NUMBER_DESCRIPTOR_UUID, SOFTWARE_REVISION_DESCRIPTOR_UUID, MANUFACTURER_DESCRIPTOR_UUID
+from .models import DecoraBLEDeviceState, DecoraBLEDeviceSummary
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ class DecoraBLEDevice():
         self._client = None
         self._device = None
         self._key = None
+        self._summary = None
         self._state = DecoraBLEDeviceState()
         self._state_callbacks: list[Callable[[
             DecoraBLEDeviceState], None]] = []
@@ -65,12 +66,47 @@ class DecoraBLEDevice():
         await self._client.connect()
         await self._unlock()
 
+        self._summary = await self._summarize()
+
         await self._register_for_state_notifications()
 
         _LOGGER.debug("Finished connecting %s", self._client.is_connected)
 
     async def disconnect(self) -> None:
         await self._client.disconnect()
+
+    def summarize(self):
+        return self._summary
+
+    async def _summarize(self) -> DecoraBLEDeviceSummary:
+        system_identifier = await self.read_summary_descriptor(
+            "system_identifier", SYSTEM_ID_DESCRIPTOR_UUID)
+        manufacturer = await self.read_summary_descriptor(
+            "manufacturer", MANUFACTURER_DESCRIPTOR_UUID)
+        model = await self.read_summary_descriptor(
+            "model", MODEL_NUMBER_DESCRIPTOR_UUID)
+        software_revision = await self.read_summary_descriptor(
+            "software_revision", SOFTWARE_REVISION_DESCRIPTOR_UUID)
+
+        return DecoraBLEDeviceSummary(
+            system_identifier=system_identifier.hex(),
+            manufacturer=manufacturer.decode('utf-8'),
+            model=model.decode('utf-8'),
+            software_revision=self._revision_string(
+                software_revision, "Software Revision"),
+        )
+
+    async def read_summary_descriptor(self, descriptor: str, descriptor_uuid: str) -> bytearray:
+        raw_response = await self._client.read_gatt_char(descriptor_uuid)
+        _LOGGER.debug("Raw %s from device: %s", descriptor, repr(raw_response))
+        return raw_response
+
+    def _revision_string(self, value: bytearray, prefix: str) -> Optional[str]:
+        stripped_value = value.decode('utf-8').removeprefix(prefix)
+        if len(stripped_value) > 0:
+            return stripped_value.strip()
+        else:
+            return None
 
     async def turn_on(self, brightness_level: Optional[int] = None) -> None:
         _LOGGER.debug("Turning on...")
@@ -89,6 +125,7 @@ class DecoraBLEDevice():
         self._device = None
         self._key = None
         self._client = None
+        self._summary = None
         self._state = DecoraBLEDeviceState()
 
     async def _unlock(self):

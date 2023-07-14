@@ -10,10 +10,11 @@ __version__ = "0.0.1"
 
 from .decora_bleak import DecoraBLEDevice
 from .const import DECORA_SERVICE_UUID
-from .models import DecoraBLEDeviceState
+from .models import DecoraBLEDeviceState, DecoraBLEDeviceSummary
 
 __all__ = [
     "DECORA_SERVICE_UUID",
     "DecoraBLEDevice",
-    "DecoraBLEDeviceState"
+    "DecoraBLEDeviceState",
+    "DecoraBLEDeviceSummary"
 ]
