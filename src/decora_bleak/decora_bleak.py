@@ -16,15 +16,17 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class DecoraBLEDevice():
-    def __init__(self):
+    def __init__(self, device: BLEDevice, api_key: str):
+        self._device = device
+        self._key = bytearray.fromhex(api_key)
+
         self._client = None
-        self._device = None
-        self._key = None
         self._summary = None
         self._state = DecoraBLEDeviceState()
         self._state_callbacks: list[Callable[[
             DecoraBLEDeviceState], None]] = []
 
+    @classmethod
     async def get_api_key(device: BLEDevice) -> Optional[str]:
         async with BleakClient(device) as client:
             await client.write_gatt_char(EVENT_CHARACTERISTIC_UUID, bytearray([0x22, 0x53, 0x00, 0x00, 0x00, 0x00, 0x00]), response=True)
@@ -43,19 +45,22 @@ class DecoraBLEDevice():
             self._state_callbacks.remove(callback)
 
         self._state_callbacks.append(callback)
+
+        if self._state is not None:
+            callback(self._state)
+
         return unregister_callback
 
-    async def connect(self, device: BLEDevice, key: str) -> None:
-        _LOGGER.debug("attempting to connect to %s using %s key",
-                      device.address, key)
-
-        if self._client is not None and self._client.is_connected:
-            _LOGGER.debug(
-                "there is already a client connected, disconnecting...")
-            self._client.disconnect()
-
+    def update_device(self, device: BLEDevice) -> None:
         self._device = device
-        self._key = bytearray.fromhex(key)
+
+    async def connect(self) -> None:
+        if self._client is not None and self._client.is_connected:
+            return
+
+        device = self._device
+        _LOGGER.debug("attempting to connect to %s using %s key",
+                      device.address, self._key)
 
         def disconnected(client):
             _LOGGER.debug("Device disconnected %s", device.address)

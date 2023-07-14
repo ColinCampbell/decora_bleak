@@ -42,8 +42,8 @@ async def summarize(address: str, api_key: str) -> None:
         _LOGGER.error("Could not find device at %s, please try again", address)
         return
 
-    decora_device = DecoraBLEDevice()
-    await decora_device.connect(device, api_key)
+    decora_device = DecoraBLEDevice(device, api_key)
+    await decora_device.connect()
 
     print(f"{decora_device.summarize()}")
 
@@ -61,8 +61,8 @@ async def connect(address: str, api_key: Optional[str]) -> None:
     if api_key is not None:
         print(f"Connecting to device at {device.address} with key: {api_key}")
 
-        decora_device = DecoraBLEDevice()
-        await decora_device.connect(device, api_key)
+        decora_device = DecoraBLEDevice(device, api_key)
+        await decora_device.connect()
 
         def state_callback(state):
             if state.is_on:
