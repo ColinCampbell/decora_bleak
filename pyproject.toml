@@ -18,7 +18,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "bleak >= 0.20.2"
+  "bleak >= 0.20.2",
+  "bleak_retry_connector >= 3.0.0"
 ]
 
 [project.optional-dependencies]
