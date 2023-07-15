@@ -8,6 +8,7 @@ from dataclasses import replace
 
 from bleak import BleakClient, BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
+from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS, establish_connection
 
 from .const import EVENT_CHARACTERISTIC_UUID, STATE_CHARACTERISTIC_UUID, UNPAIRED_API_KEY, SYSTEM_ID_DESCRIPTOR_UUID, MODEL_NUMBER_DESCRIPTOR_UUID, SOFTWARE_REVISION_DESCRIPTOR_UUID, MANUFACTURER_DESCRIPTOR_UUID
 from .models import DecoraBLEDeviceState, DecoraBLEDeviceSummary
@@ -85,11 +86,15 @@ class DecoraBLEDevice():
             _LOGGER.debug("Device disconnected %s", device.address)
             self._disconnect_cleanup()
 
-        self._client = BleakClient(device, disconnected_callback=disconnected)
+        self._client = await establish_connection(
+            BleakClient,
+            self._device,
+            self._device.name,
+            disconnected,
+            use_services_cache=True,
+        )
 
-        await self._client.connect()
         await self._unlock()
-
         await self._register_for_state_notifications()
 
         self._summary = await self._summarize()
