@@ -23,6 +23,8 @@ class DecoraBLEDevice():
         self._client = None
         self._summary = None
         self._state = DecoraBLEDeviceState()
+        self._connection_callbacks: list[Callable[[
+            DecoraBLEDeviceSummary], None]] = []
         self._state_callbacks: list[Callable[[
             DecoraBLEDeviceState], None]] = []
 
@@ -38,6 +40,19 @@ class DecoraBLEDevice():
             else:
                 return None
 
+    async def register_connection_callback(
+        self, callback: Callable[[DecoraBLEDeviceSummary], None]
+    ) -> Callable[[], None]:
+        def unregister_callback() -> None:
+            self._connection_callbacks.remove(callback)
+
+        self._connection_callbacks.append(callback)
+
+        if self._summary is not None:
+            callback(self._summary)
+
+        return unregister_callback
+
     async def register_state_callback(
         self, callback: Callable[[DecoraBLEDeviceState], None]
     ) -> Callable[[], None]:
@@ -51,11 +66,15 @@ class DecoraBLEDevice():
 
         return unregister_callback
 
+    @property
+    def is_connected(self) -> bool:
+        return self._client is not None and self._client.is_connected
+
     def update_device(self, device: BLEDevice) -> None:
         self._device = device
 
     async def connect(self) -> None:
-        if self._client is not None and self._client.is_connected:
+        if self.is_connected:
             return
 
         device = self._device
@@ -71,17 +90,15 @@ class DecoraBLEDevice():
         await self._client.connect()
         await self._unlock()
 
-        self._summary = await self._summarize()
-
         await self._register_for_state_notifications()
+
+        self._summary = await self._summarize()
+        self._fire_connection_callbacks(self._summary)
 
         _LOGGER.debug("Finished connecting %s", self._client.is_connected)
 
     async def disconnect(self) -> None:
         await self._client.disconnect()
-
-    def summarize(self):
-        return self._summary
 
     async def _summarize(self) -> DecoraBLEDeviceSummary:
         system_identifier = await self.read_summary_descriptor(
@@ -151,10 +168,14 @@ class DecoraBLEDevice():
     async def _register_for_state_notifications(self) -> None:
         def callback(sender: BleakGATTCharacteristic, data: bytearray) -> None:
             self._apply_device_state_data(data)
-            self._fire_state_callbacks()
+            self._fire_state_callbacks(self._state)
 
         await self._client.start_notify(STATE_CHARACTERISTIC_UUID, callback)
 
-    def _fire_state_callbacks(self) -> None:
+    def _fire_connection_callbacks(self, summary: DecoraBLEDeviceSummary) -> None:
+        for callback in self._connection_callbacks:
+            callback(summary)
+
+    def _fire_state_callbacks(self, state: DecoraBLEDeviceState) -> None:
         for callback in self._state_callbacks:
-            callback(self._state)
+            callback(state)
