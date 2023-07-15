@@ -40,7 +40,7 @@ class DecoraBLEDevice():
             else:
                 return None
 
-    async def register_connection_callback(
+    def register_connection_callback(
         self, callback: Callable[[DecoraBLEDeviceSummary], None]
     ) -> Callable[[], None]:
         def unregister_callback() -> None:
@@ -53,7 +53,7 @@ class DecoraBLEDevice():
 
         return unregister_callback
 
-    async def register_state_callback(
+    def register_state_callback(
         self, callback: Callable[[DecoraBLEDeviceState], None]
     ) -> Callable[[], None]:
         def unregister_callback() -> None:
