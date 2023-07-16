@@ -75,7 +75,7 @@ async def connect(address: str, api_key: Optional[str]) -> None:
                     f"Light is now turned on ({state.brightness_level}% brightness)")
             else:
                 print("Light is now turned off")
-        unregister_callback = await decora_device.register_state_callback(state_callback)
+        unregister_callback = decora_device.register_state_callback(state_callback)
 
         await decora_device.turn_on(brightness_level=100)
         await asyncio.sleep(5)
