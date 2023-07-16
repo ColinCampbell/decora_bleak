@@ -11,7 +11,7 @@ from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
-from . import DecoraBLEDevice, DECORA_SERVICE_UUID
+from . import DecoraBLEDevice, DECORA_SERVICE_UUID, DeviceNotInPairingModeError, IncorrectAPIKeyError, BLEAK_EXCEPTIONS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ handlers = [stdout_handler]
 logging.basicConfig(level=logging.ERROR,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', handlers=handlers)
 
-_LOGGER.setLevel(logging.ERROR)
+_LOGGER.setLevel(logging.FATAL)
 logging.getLogger("decora_bleak").setLevel(logging.ERROR)
 
 
@@ -60,14 +60,41 @@ async def connect(address: str, api_key: Optional[str]) -> None:
         return
 
     if api_key is None:
-        api_key = await DecoraBLEDevice.get_api_key(device)
+        try:
+            api_key = await DecoraBLEDevice.get_api_key(device)
+        except DeviceNotInPairingModeError as ex:
+            _LOGGER.error(ex)
+            print(f"Device not in pairing mode, hold down on the switch for a few seconds until a green light flashes")
+            return
+        except BLEAK_EXCEPTIONS as ex:
+            _LOGGER.error(ex)
+            print(f"Connection error: {ex}")
+            return
+        except Exception as ex:
+            _LOGGER.error(ex)
+            print(f"Unexpected error occurred")
+            return
+
         print(f"Fetched API key from device: {api_key}")
 
     if api_key is not None:
         print(f"Connecting to device at {device.address} with key: {api_key}")
 
         decora_device = DecoraBLEDevice(device, api_key)
-        await decora_device.connect()
+        try:
+            await decora_device.connect()
+        except IncorrectAPIKeyError as ex:
+            _LOGGER.error(ex)
+            print("Incorrect API key, try putting the device into pairing mode and reinvoking the script without an API key argument")
+            return
+        except BLEAK_EXCEPTIONS as ex:
+            _LOGGER.error(ex)
+            print(f"Connection error: {ex}")
+            return
+        except Exception as ex:
+            _LOGGER.error(ex)
+            print(f"Unexpected error: {ex}")
+            return
 
         def state_callback(state):
             if state.is_on:

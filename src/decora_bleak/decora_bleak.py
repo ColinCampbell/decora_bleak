@@ -11,6 +11,7 @@ from bleak.backends.device import BLEDevice
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS, establish_connection
 
 from .const import EVENT_CHARACTERISTIC_UUID, STATE_CHARACTERISTIC_UUID, UNPAIRED_API_KEY, SYSTEM_ID_DESCRIPTOR_UUID, MODEL_NUMBER_DESCRIPTOR_UUID, SOFTWARE_REVISION_DESCRIPTOR_UUID, MANUFACTURER_DESCRIPTOR_UUID
+from .exceptions import DeviceNotInPairingModeError, IncorrectAPIKeyError
 from .models import DecoraBLEDeviceState, DecoraBLEDeviceSummary
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class DecoraBLEDevice():
             DecoraBLEDeviceState], None]] = []
 
     @classmethod
-    async def get_api_key(device: BLEDevice) -> Optional[str]:
+    async def get_api_key(device: BLEDevice) -> str:
         async with BleakClient(device) as client:
             await client.write_gatt_char(EVENT_CHARACTERISTIC_UUID, bytearray([0x22, 0x53, 0x00, 0x00, 0x00, 0x00, 0x00]), response=True)
             rawkey = await client.read_gatt_char(EVENT_CHARACTERISTIC_UUID)
@@ -39,7 +40,7 @@ class DecoraBLEDevice():
             if rawkey[2:6] != UNPAIRED_API_KEY:
                 return bytearray(rawkey)[2:].hex()
             else:
-                return None
+                raise DeviceNotInPairingModeError
 
     def register_connection_callback(
         self, callback: Callable[[DecoraBLEDeviceSummary], None]
@@ -95,12 +96,17 @@ class DecoraBLEDevice():
         )
 
         await self._unlock()
-        await self._register_for_state_notifications()
 
-        self._summary = await self._summarize()
-        self._fire_connection_callbacks(self._summary)
+        try:
+            # Issues in unlocking will be seen when first interacting with the device
+            await self._register_for_state_notifications()
 
-        _LOGGER.debug("Finished connecting %s", self._client.is_connected)
+            self._summary = await self._summarize()
+            self._fire_connection_callbacks(self._summary)
+
+            _LOGGER.debug("Finished connecting %s", self._client.is_connected)
+        except BLEAK_EXCEPTIONS as ex:
+            raise IncorrectAPIKeyError
 
     async def disconnect(self) -> None:
         await self._client.disconnect()

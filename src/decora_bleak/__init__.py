@@ -8,13 +8,17 @@
 
 __version__ = "0.1.0"
 
-from .decora_bleak import DecoraBLEDevice
 from .const import DECORA_SERVICE_UUID
+from .decora_bleak import BLEAK_EXCEPTIONS, DecoraBLEDevice
+from .exceptions import DeviceNotInPairingModeError, IncorrectAPIKeyError
 from .models import DecoraBLEDeviceState, DecoraBLEDeviceSummary
 
 __all__ = [
     "DECORA_SERVICE_UUID",
     "DecoraBLEDevice",
     "DecoraBLEDeviceState",
-    "DecoraBLEDeviceSummary"
+    "DecoraBLEDeviceSummary",
+    "BLEAK_EXCEPTIONS",
+    "DeviceNotInPairingModeError",
+    "IncorrectAPIKeyError"
 ]
