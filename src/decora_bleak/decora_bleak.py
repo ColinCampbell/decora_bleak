@@ -72,6 +72,10 @@ class DecoraBLEDevice():
     def is_connected(self) -> bool:
         return self._client is not None and self._client.is_connected
 
+    @property
+    def summary(self) -> Optional[DecoraBLEDeviceSummary]:
+        return self._summary
+
     def update_device(self, device: BLEDevice) -> None:
         self._device = device
 
