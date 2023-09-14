@@ -30,7 +30,7 @@ class DecoraBLEDevice():
         self._state_callbacks: list[Callable[[
             DecoraBLEDeviceState], None]] = []
 
-    @classmethod
+    @staticmethod
     async def get_api_key(device: BLEDevice) -> str:
         async with BleakClient(device) as client:
             await client.write_gatt_char(EVENT_CHARACTERISTIC_UUID, bytearray([0x22, 0x53, 0x00, 0x00, 0x00, 0x00, 0x00]), response=True)
