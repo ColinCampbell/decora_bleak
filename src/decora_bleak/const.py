@@ -6,6 +6,8 @@
 # MIT license
 # This code was inspired by https://github.com/mjg59/python-decora and https://github.com/lucapinello/pydecora_ble/tree/master
 
+WAIT_FOR_DEVICE_CONNECTION_TIMEOUT = 30
+
 UNPAIRED_API_KEY = bytearray(b'LEVI')
 
 DECORA_SERVICE_UUID = "0000ff00-0000-1000-8000-00805f9b34fb"

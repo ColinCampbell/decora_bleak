@@ -1,4 +1,7 @@
 from __future__ import annotations
+import contextlib
+
+import async_timeout
 
 import asyncio
 import logging
@@ -10,8 +13,8 @@ from bleak import BleakClient, BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS, establish_connection
 
-from .const import EVENT_CHARACTERISTIC_UUID, STATE_CHARACTERISTIC_UUID, UNPAIRED_API_KEY, SYSTEM_ID_DESCRIPTOR_UUID, MODEL_NUMBER_DESCRIPTOR_UUID, SOFTWARE_REVISION_DESCRIPTOR_UUID, MANUFACTURER_DESCRIPTOR_UUID
-from .exceptions import DeviceNotInPairingModeError, IncorrectAPIKeyError
+from .const import EVENT_CHARACTERISTIC_UUID, STATE_CHARACTERISTIC_UUID, UNPAIRED_API_KEY, SYSTEM_ID_DESCRIPTOR_UUID, MODEL_NUMBER_DESCRIPTOR_UUID, SOFTWARE_REVISION_DESCRIPTOR_UUID, MANUFACTURER_DESCRIPTOR_UUID, WAIT_FOR_DEVICE_CONNECTION_TIMEOUT
+from .exceptions import DeviceConnectionError, DeviceConnectionTimeoutError, DeviceNotInPairingModeError, IncorrectAPIKeyError
 from .models import DecoraBLEDeviceState, DecoraBLEDeviceSummary
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,6 +24,9 @@ class DecoraBLEDevice():
     def __init__(self, device: BLEDevice, api_key: str):
         self._device = device
         self._key = bytearray.fromhex(api_key)
+
+        self._running = False
+        self._device_connection_future: asyncio.Future[None] | None = None
 
         self._client = None
         self._summary = None
@@ -41,6 +47,36 @@ class DecoraBLEDevice():
                 return bytearray(rawkey)[2:].hex()
             else:
                 raise DeviceNotInPairingModeError
+
+    async def start(self) -> Callable[[], None]:
+        """Start watching for updates."""
+        if self._running:
+            raise RuntimeError("Already running")
+        self._running = True
+        self._device_connection_future = asyncio.get_running_loop().create_future()
+
+        def _cancel() -> None:
+            self._running = False
+
+        return _cancel
+
+    async def wait_for_device_connection(self) -> None:
+        if not self._running:
+            raise RuntimeError("Not running")
+        if not self._device_connection_future:
+            raise RuntimeError("Already waited for first update")
+        try:
+            async with async_timeout.timeout(WAIT_FOR_DEVICE_CONNECTION_TIMEOUT):
+                await self._device_connection_future
+        except (asyncio.TimeoutError, asyncio.CancelledError) as ex:
+            self._device_connection_future.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._device_connection_future
+            raise DeviceConnectionTimeoutError(
+                "No advertisement received before timeout"
+            ) from ex
+        finally:
+            self._device_connection_future = None
 
     def register_connection_callback(
         self, callback: Callable[[DecoraBLEDeviceSummary], None]
@@ -91,25 +127,31 @@ class DecoraBLEDevice():
             _LOGGER.debug("Device disconnected %s", device.address)
             self._disconnect_cleanup()
 
-        self._client = await establish_connection(
-            BleakClient,
-            self._device,
-            self._device.name,
-            disconnected,
-            use_services_cache=True,
-        )
+        try:
+            self._client = await establish_connection(
+                BleakClient,
+                self._device,
+                self._device.name,
+                disconnected,
+                use_services_cache=True,
+            )
 
-        await self._unlock()
+            await self._unlock()
+        except Exception as ex:
+            self._handle_device_connection(ex)
+            raise DeviceConnectionError(str(ex)) from ex
 
         try:
             # Issues in unlocking will be seen when first interacting with the device
             await self._register_for_state_notifications()
 
             self._summary = await self._summarize()
+            self._handle_device_connection(None)
             self._fire_connection_callbacks(self._summary)
 
             _LOGGER.debug("Finished connecting %s", self._client.is_connected)
         except BLEAK_EXCEPTIONS as ex:
+            self._handle_device_connection(ex)
             raise IncorrectAPIKeyError
 
     async def disconnect(self) -> None:
@@ -186,6 +228,15 @@ class DecoraBLEDevice():
             self._fire_state_callbacks(self._state)
 
         await self._client.start_notify(STATE_CHARACTERISTIC_UUID, callback)
+
+    def _handle_device_connection(self, exception: Exception | None) -> None:
+        """Set the device connection future to resolve it."""
+        if not self._device_connection_future:
+            return
+        if exception:
+            self._device_connection_future.set_exception(exception)
+        else:
+            self._device_connection_future.set_result(None)
 
     def _fire_connection_callbacks(self, summary: DecoraBLEDeviceSummary) -> None:
         for callback in self._connection_callbacks:
