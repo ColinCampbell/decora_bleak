@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "decora_bleak"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
   { name="Colin Campbell", email="colin.campbell@gmail.com" },
 ]
@@ -29,7 +29,7 @@ dev = ["bumpver", "isort", "pip-tools", "pytest"]
 decora = "decora_bleak.cmd:main"
 
 [tool.bumpver]
-current_version = "0.1.0"
+current_version = "0.2.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 
 [tool.bumpver.file_patterns]
