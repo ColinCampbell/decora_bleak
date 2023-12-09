@@ -17,13 +17,3 @@ decora connect -a "C84441EE-5C57-2681-1BD5-82AF18C58F5D"
 ```
 decora connect -a "C84441EE-5C57-2681-1BD5-82AF18C58F5D" -k "8c4c89fa00"
 ```
-
-## Releasing
-
-One of
-
-```
-bumpver update --commit --tag-commit --push --major
-bumpver update --commit --tag-commit --push --minor
-bumpver update --commit --tag-commit --push --patch
-```
