@@ -11,7 +11,7 @@ from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
-from . import DecoraBLEDevice, DECORA_SERVICE_UUID, DeviceNotInPairingModeError, IncorrectAPIKeyError, BLEAK_EXCEPTIONS
+from . import DecoraBLEDevice, DECORA_SERVICE_UUID, DeviceConnectionError, DeviceNotInPairingModeError, IncorrectAPIKeyError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ async def connect(address: str, api_key: Optional[str]) -> None:
             _LOGGER.error(ex)
             print(f"Device not in pairing mode, hold down on the switch for a few seconds until a green light flashes")
             return
-        except BLEAK_EXCEPTIONS as ex:
+        except DeviceConnectionError as ex:
             _LOGGER.error(ex)
             print(f"Connection error: {ex}")
             return
@@ -87,7 +87,7 @@ async def connect(address: str, api_key: Optional[str]) -> None:
             _LOGGER.error(ex)
             print("Incorrect API key, try putting the device into pairing mode and reinvoking the script without an API key argument")
             return
-        except BLEAK_EXCEPTIONS as ex:
+        except DeviceConnectionError as ex:
             _LOGGER.error(ex)
             print(f"Connection error: {ex}")
             return
