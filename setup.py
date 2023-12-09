@@ -11,5 +11,5 @@ import setuptools
 if __name__ == "__main__":
     setuptools.setup(
         name="decora_bleak",
-        version="0.2.1"
+        version="0.2.2"
     )
