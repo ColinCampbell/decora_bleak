@@ -46,10 +46,21 @@ async def summarize(address: str, api_key: str) -> None:
         print(f"{summary}")
 
     decora_device = DecoraBLEDevice(device, api_key)
-    unregister_callback = decora_device.register_connection_callback(connection_callback)
+    unregister_connection_callback = decora_device.register_connection_callback(connection_callback)
+
+    def state_callback(state):
+        if state.is_on:
+            print(
+                f"Light is turned on ({state.brightness_level}% brightness)")
+        else:
+            print("Light is turned off")
+    unregister_state_callback = decora_device.register_state_callback(state_callback)
+
     await decora_device.connect()
 
-    unregister_callback()
+    unregister_connection_callback()
+    unregister_state_callback()
+
     await decora_device.disconnect()
 
 

@@ -149,6 +149,8 @@ class DecoraBLEDevice():
             self._handle_device_connection(None)
             self._fire_connection_callbacks(self._summary)
 
+            await self._read_state()
+
             _LOGGER.debug("Finished connecting %s", self._client.is_connected)
         except BLEAK_EXCEPTIONS as ex:
             self._handle_device_connection(ex)
@@ -221,6 +223,11 @@ class DecoraBLEDevice():
         packet = bytearray([1 if state.is_on else 0, state.brightness_level])
         _LOGGER.debug("Writing state: %s", state)
         await self._client.write_gatt_char(STATE_CHARACTERISTIC_UUID, packet, response=True)
+
+    async def _read_state(self) -> None:
+        data = await self._client.read_gatt_char(STATE_CHARACTERISTIC_UUID)
+        self._apply_device_state_data(data)
+        self._fire_state_callbacks(self._state)
 
     async def _register_for_state_notifications(self) -> None:
         def callback(sender: BleakGATTCharacteristic, data: bytearray) -> None:
